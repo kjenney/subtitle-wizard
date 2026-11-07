@@ -7,8 +7,9 @@ import { videoPlayer } from './player/VideoPlayer.js';
 import { subtitleManager } from './subtitles/SubtitleManager.js';
 import { subtitleEditor } from './subtitles/SubtitleEditor.js';
 import { sessionStore } from './storage/SessionStore.js';
-import { pollyClient } from './aws/pollyClient.js';
+import { pollyClient, PollyClient } from './aws/pollyClient.js';
 import { pollySyncer } from './subtitles/PollySyncer.js';
+import { credentialsManager } from './aws/credentials.js';
 import { logger } from './utils/logger.js';
 import { toastManager } from './ui/Toast.js';
 
@@ -52,6 +53,9 @@ class SubtitleWizard {
     // Setup event handlers
     this.setupEventHandlers();
 
+    // Check for existing credentials and update UI
+    this.updateCredentialsUI();
+
     // Load saved session if exists
     this.loadSavedSession();
 
@@ -67,6 +71,9 @@ class SubtitleWizard {
       this.handleVideoUpload(file);
     });
 
+    // Setup credential handlers
+    this.setupCredentialHandlers();
+
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
       this.handleKeyboardShortcuts(e);
@@ -76,6 +83,173 @@ class SubtitleWizard {
     window.addEventListener('resize', () => {
       this.handleResize();
     });
+  }
+
+  /**
+   * Setup AWS credentials UI handlers
+   */
+  setupCredentialHandlers() {
+    const credentialsBtn = document.getElementById('credentials-btn');
+    const closeCredentialsBtn = document.getElementById('close-credentials-btn');
+    const saveCredentialsBtn = document.getElementById('save-credentials-btn');
+    const clearCredentialsBtn = document.getElementById('clear-credentials-btn');
+    const credentialsModal = document.getElementById('credentials-modal');
+
+    // Show credentials modal
+    if (credentialsBtn) {
+      credentialsBtn.addEventListener('click', () => {
+        // Load existing credentials
+        this.loadCredentialsIntoForm();
+        credentialsModal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+      });
+    }
+
+    // Hide credentials modal
+    if (closeCredentialsBtn) {
+      closeCredentialsBtn.addEventListener('click', () => {
+        credentialsModal.style.display = 'none';
+        document.body.style.overflow = '';
+      });
+    }
+
+    // Close modal when clicking outside
+    if (credentialsModal) {
+      credentialsModal.addEventListener('click', (e) => {
+        if (e.target === credentialsModal) {
+          credentialsModal.style.display = 'none';
+          document.body.style.overflow = '';
+        }
+      });
+    }
+
+    // Save credentials
+    if (saveCredentialsBtn) {
+      saveCredentialsBtn.addEventListener('click', async () => {
+        await this.handleSaveCredentials(saveCredentialsBtn);
+      });
+    }
+
+    // Clear credentials
+    if (clearCredentialsBtn) {
+      clearCredentialsBtn.addEventListener('click', async () => {
+        await this.handleClearCredentials();
+      });
+    }
+  }
+
+  /**
+   * Update credentials UI indicator
+   */
+  async updateCredentialsUI() {
+    const credentialsBtn = document.getElementById('credentials-btn');
+    if (credentialsBtn) {
+      const hasCredentials = credentialsManager.hasCredentials();
+      if (hasCredentials) {
+        credentialsBtn.textContent = 'Credentials Saved';
+        credentialsBtn.classList.remove('btn-secondary');
+        credentialsBtn.classList.add('btn-success');
+      }
+    }
+  }
+
+  /**
+   * Load credentials from storage into form
+   */
+  async loadCredentialsIntoForm() {
+    const credentials = await credentialsManager.getCredentials();
+    if (credentials) {
+      const awsKeyIdInput = document.getElementById('aws-key-id');
+      const awsSecretKeyInput = document.getElementById('aws-secret-key');
+      const awsRegionSelect = document.getElementById('aws-region');
+
+      if (awsKeyIdInput) awsKeyIdInput.value = credentials.accessKeyId || '';
+      if (awsSecretKeyInput) awsSecretKeyInput.value = '';
+      if (awsRegionSelect) awsRegionSelect.value = credentials.region || 'us-east-1';
+    }
+  }
+
+  /**
+   * Handle save credentials button click
+   */
+  async handleSaveCredentials(btn) {
+    const awsKeyIdInput = document.getElementById('aws-key-id');
+    const awsSecretKeyInput = document.getElementById('aws-secret-key');
+    const awsRegionSelect = document.getElementById('aws-region');
+
+    const accessKeyId = awsKeyIdInput?.value?.trim();
+    const secretAccessKey = awsSecretKeyInput?.value;
+    const region = awsRegionSelect?.value;
+
+    if (!accessKeyId || !secretAccessKey) {
+      toastManager.error('Please enter both Access Key ID and Secret Access Key');
+      return;
+    }
+
+    // Show loading state on button
+    if (btn) {
+      const originalText = btn.textContent;
+      btn.textContent = 'Testing...';
+      btn.disabled = true;
+    }
+
+    try {
+      await credentialsManager.storeCredentials(accessKeyId, secretAccessKey, region);
+
+      // Test credentials with Polly
+      toastManager.info('Testing credentials...');
+
+      // Create a temporary client to test - use the describeVoices with a real call
+      const testClient = new PollyClient({ accessKeyId, secretAccessKey, region });
+      await testClient.init();
+
+      // Use describeVoices to verify credentials - this requires valid AWS credentials
+      const voices = await testClient.describeVoices('en-US');
+
+      // We expect at least some voices or we'd get an error
+      if (voices && voices.length > 0) {
+        toastManager.success('Credentials saved and tested successfully!');
+        document.getElementById('credentials-modal').style.display = 'none';
+      } else {
+        logger.warn('No voices returned from describeVoices');
+        // If we got here without error, credentials are valid but region may be wrong
+        toastManager.success('Credentials saved successfully!');
+        document.getElementById('credentials-modal').style.display = 'none';
+      }
+
+    } catch (error) {
+      logger.error('Failed to save/test credentials:', error);
+      // Check if it's an auth error
+      const errorMessage = error.message || String(error);
+      if (errorMessage.includes('Unauthorized') || errorMessage.includes('InvalidClientTokenId') || errorMessage.includes('SignatureDoesNotMatch')) {
+        toastManager.error('Invalid AWS credentials. Please check your Access Key ID and Secret Access Key.');
+      } else {
+        toastManager.error(`Failed to test credentials: ${errorMessage}`);
+      }
+    } finally {
+      // Restore button state
+      if (btn) {
+        btn.textContent = 'Save & Test';
+        btn.disabled = false;
+      }
+    }
+  }
+
+  /**
+   * Handle clear credentials button click
+   */
+  async handleClearCredentials() {
+    if (!confirm('Are you sure you want to clear your AWS credentials?')) return;
+
+    await credentialsManager.clearCredentials();
+
+    // Clear form
+    document.getElementById('aws-key-id').value = '';
+    document.getElementById('aws-secret-key').value = '';
+    toastManager.success('Credentials cleared');
+
+    // Update UI indicator
+    this.updateCredentialsUI();
   }
 
   /**

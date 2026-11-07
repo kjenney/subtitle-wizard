@@ -523,6 +523,7 @@
         Subtitle Wizard
       </div>
       <nav class="nav-links">
+        <button class="btn btn-secondary" id="credentials-btn">Settings</button>
         <button class="btn btn-secondary" id="help-btn">Help</button>
       </nav>
     </div>
@@ -639,15 +640,19 @@
       </div>
     </section>
 
-    <!-- AWS Credentials Section -->
-    <section id="credentials-section" style="display: none; margin-bottom: var(--space-xl);">
-      <div style="background: var(--bg-secondary); padding: var(--space-lg); border-radius: var(--radius-lg);">
-        <h3 style="margin-bottom: var(--space-md);">AWS Credentials</h3>
-        <p class="form-label" style="margin-bottom: var(--space-lg); color: var(--fg-secondary);">
-          Enter your AWS Access Key ID and Secret Access Key to use Amazon Polly for subtitle generation.
-          Credentials are stored encrypted in your browser's local storage.
-        </p>
-        <div class="form-group">
+    <!-- AWS Credentials Modal -->
+    <div id="credentials-modal" class="modal" style="display: none;">
+      <div class="modal-content" style="max-width: 600px; max-height: 90vh; overflow-y: auto;">
+        <div class="modal-header" style="border-bottom: 1px solid var(--bg-tertiary);">
+          <h2>AWS Credentials</h2>
+          <button class="modal-close" id="close-credentials-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p class="form-label" style="margin-bottom: var(--space-lg); color: var(--fg-secondary);">
+            Enter your AWS Access Key ID and Secret Access Key to use Amazon Polly for subtitle generation.
+            Credentials are stored encrypted in your browser's local storage.
+          </p>
+          <div class="form-group">
           <label class="form-label" for="aws-key-id">Access Key ID</label>
           <input type="text" class="form-input" id="aws-key-id" placeholder="AKIA..." autocomplete="off">
         </div>
@@ -668,8 +673,9 @@
           <button class="btn btn-secondary" id="save-credentials-btn">Save & Test</button>
           <button class="btn btn-secondary" id="clear-credentials-btn">Clear</button>
         </div>
+        </div>
       </div>
-    </section>
+    </div>
 
     <!-- Help Modal -->
     <div id="help-modal" class="modal" style="display: none;">
@@ -683,7 +689,7 @@
             <h3 style="color: var(--accent); margin-bottom: var(--space-md);">Getting Started (5 minutes)</h3>
             <ol style="padding-left: var(--space-xl); line-height: 1.8;">
               <li><strong>Open this app</strong> in Chrome, Firefox, Safari, or Edge</li>
-              <li><strong>Setup AWS Credentials</strong> - Click "AWS Credentials" below and enter your Access Key ID and Secret Key</li>
+              <li><strong>Setup AWS Credentials</strong> - Click "Settings" in the header and enter your Access Key ID and Secret Key</li>
               <li><strong>Upload a video</strong> - Drag & drop or click "Choose File" (MP4, WebM, OGG, MOV)</li>
               <li><strong>Extract Audio</strong> - Click "Extract Audio" button</li>
               <li><strong>Generate Subtitles</strong> - Click "Generate Subtitles" and wait for Polly</li>
