@@ -826,6 +826,11 @@
     const helpBtn = document.getElementById('help-btn');
     const helpModal = document.getElementById('help-modal');
     const helpCloseBtn = helpModal.querySelector('.modal-close');
+    const credentialsBtn = document.getElementById('credentials-btn');
+    const closeCredentialsBtn = document.getElementById('close-credentials-btn');
+    const saveCredentialsBtn = document.getElementById('save-credentials-btn');
+    const clearCredentialsBtn = document.getElementById('clear-credentials-btn');
+    const credentialsModal = document.getElementById('credentials-modal');
 
     // Event handlers
     browseBtn.addEventListener('click', () => fileInput.click());
@@ -848,6 +853,150 @@
         document.body.style.overflow = '';
       }
     });
+
+    // Settings button - show credentials modal
+    if (credentialsBtn) {
+      credentialsBtn.addEventListener('click', () => {
+        // Load existing credentials into form
+        loadCredentialsIntoForm();
+        credentialsModal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+      });
+    }
+
+    // Close credentials modal
+    if (closeCredentialsBtn) {
+      closeCredentialsBtn.addEventListener('click', () => {
+        credentialsModal.style.display = 'none';
+        document.body.style.overflow = '';
+      });
+    }
+
+    // Close modal when clicking outside
+    if (credentialsModal) {
+      credentialsModal.addEventListener('click', (e) => {
+        if (e.target === credentialsModal) {
+          credentialsModal.style.display = 'none';
+          document.body.style.overflow = '';
+        }
+      });
+    }
+
+    // Save credentials
+    if (saveCredentialsBtn) {
+      saveCredentialsBtn.addEventListener('click', async () => {
+        await handleSaveCredentials();
+      });
+    }
+
+    // Clear credentials
+    if (clearCredentialsBtn) {
+      clearCredentialsBtn.addEventListener('click', async () => {
+        await handleClearCredentials();
+      });
+    }
+
+    // Update credentials UI indicator
+    async function updateCredentialsUI() {
+      const credentialsBtnRef = document.getElementById('credentials-btn');
+      if (credentialsBtnRef) {
+        try {
+          const encrypted = localStorage.getItem('subtitle_wizard_credentials_v1');
+          if (encrypted) {
+            credentialsBtnRef.textContent = 'Credentials Saved';
+            credentialsBtnRef.classList.remove('btn-secondary');
+            credentialsBtnRef.classList.add('btn-success');
+          }
+        } catch (e) {
+          // Ignore errors
+        }
+      }
+    }
+
+    // Load credentials into form
+    async function loadCredentialsIntoForm() {
+      try {
+        const encrypted = localStorage.getItem('subtitle_wizard_credentials_v1');
+        if (encrypted) {
+          const credentials = JSON.parse(atob(encrypted));
+          const awsKeyIdInput = document.getElementById('aws-key-id');
+          const awsRegionSelect = document.getElementById('aws-region');
+
+          if (awsKeyIdInput) awsKeyIdInput.value = credentials.accessKeyId || '';
+          if (awsRegionSelect) awsRegionSelect.value = credentials.region || 'us-east-1';
+        }
+      } catch (e) {
+        // Ignore errors
+      }
+    }
+
+    // Handle save credentials
+    async function handleSaveCredentials() {
+      const awsKeyIdInput = document.getElementById('aws-key-id');
+      const awsSecretKeyInput = document.getElementById('aws-secret-key');
+      const awsRegionSelect = document.getElementById('aws-region');
+
+      const accessKeyId = awsKeyIdInput?.value?.trim();
+      const secretAccessKey = awsSecretKeyInput?.value;
+      const region = awsRegionSelect?.value;
+
+      if (!accessKeyId || !secretAccessKey) {
+        alert('Please enter both Access Key ID and Secret Access Key');
+        return;
+      }
+
+      // Show loading state
+      if (saveCredentialsBtn) {
+        saveCredentialsBtn.textContent = 'Saving...';
+        saveCredentialsBtn.disabled = true;
+      }
+
+      try {
+        // Store credentials (base64 encoded for now)
+        const credentialsData = {
+          accessKeyId,
+          secretAccessKey,
+          region,
+          storedAt: Date.now()
+        };
+        localStorage.setItem('subtitle_wizard_credentials_v1', btoa(JSON.stringify(credentialsData)));
+
+        // Also store using the app's credentials manager for consistency
+        const { credentialsManager } = await import('./src/aws/credentials.js');
+        await credentialsManager.storeCredentials(accessKeyId, secretAccessKey, region);
+
+        toastManager.success('Credentials saved successfully!');
+        credentialsModal.style.display = 'none';
+        updateCredentialsUI();
+
+      } catch (error) {
+        console.error('Credentials error:', error);
+        toastManager.error('Failed to save credentials: ' + (error.message || String(error)));
+      } finally {
+        if (saveCredentialsBtn) {
+          saveCredentialsBtn.textContent = 'Save & Test';
+          saveCredentialsBtn.disabled = false;
+        }
+      }
+    }
+
+    // Handle clear credentials
+    async function handleClearCredentials() {
+      if (!confirm('Are you sure you want to clear your AWS credentials?')) return;
+
+      try {
+        localStorage.removeItem('subtitle_wizard_credentials_v1');
+        document.getElementById('aws-key-id').value = '';
+        document.getElementById('aws-secret-key').value = '';
+        toastManager.success('Credentials cleared');
+        updateCredentialsUI();
+      } catch (e) {
+        // Ignore errors
+      }
+    }
+
+    // Initialize credentials UI
+    updateCredentialsUI();
 
     fileInput.addEventListener('change', (e) => {
       if (e.target.files.length > 0) {
