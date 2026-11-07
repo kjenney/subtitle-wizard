@@ -79,6 +79,30 @@ export class SessionStore {
 
     } catch (error) {
       logger.error('Failed to save session:', error);
+      // Try plain save for any encryption-related error or localStorage quota errors
+      const shouldTryPlainSave = error.message && (
+        error.message.includes('too large') ||
+        error.message.includes('source array') ||
+        error.message.includes('RangeError') ||
+        error.message.includes('QuotaExceeded') ||
+        error.message.includes('localStorage') ||
+        // For any crypto-related error, try plain save as fallback
+        error.name === 'EncryptError' ||
+        error.name === 'EncryptionError' ||
+        error.name === 'CryptoError'
+      );
+      if (shouldTryPlainSave) {
+        logger.warn('Session save with encryption failed, attempting plain save');
+        try {
+          const plainData = btoa(JSON.stringify(this.session));
+          localStorage.setItem(STORAGE_KEYS.SESSION, plainData);
+          logger.info('Session saved in plain format (unencrypted)');
+          return true;
+        } catch (plainError) {
+          logger.error('Failed to save session even without encryption:', plainError);
+          return false;
+        }
+      }
       return false;
     }
   }

@@ -2,7 +2,8 @@
  * Subtitle Wizard - File utilities
  */
 
-import { formatFileSize, MAX_FILE_SIZE, SUPPORTED_VIDEO_TYPES } from '../config.js';
+import { MAX_FILE_SIZE, SUPPORTED_VIDEO_TYPES } from '../config.js';
+import { formatFileSize } from './timeUtils.js';
 
 /**
  * Validate if a file is a supported video format

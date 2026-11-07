@@ -442,6 +442,73 @@
         gap: var(--space-md);
       }
     }
+
+    /* Modal */
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-content {
+      background: var(--bg-secondary);
+      border-radius: var(--radius-lg);
+      width: 90%;
+      max-width: 600px;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-md);
+      border-bottom: 1px solid var(--bg-tertiary);
+    }
+
+    .modal-header h2 {
+      margin: 0;
+      font-size: 1.25rem;
+      color: var(--fg-primary);
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--fg-secondary);
+      font-size: 1.5rem;
+      cursor: pointer;
+      padding: var(--space-xs);
+      line-height: 1;
+    }
+
+    .modal-close:hover {
+      color: var(--fg-primary);
+    }
+
+    .modal-body {
+      padding: var(--space-lg);
+      overflow-y: auto;
+    }
+
+    .modal-body a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .modal-body a:hover {
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
@@ -460,6 +527,17 @@
       </nav>
     </div>
   </header>
+
+  <!-- Server Warning (only shown if scripts fail to load) -->
+  <div id="server-warning" style="display: none; padding: var(--space-xl); max-width: 600px; margin: 0 auto; background: var(--error); color: white; border-radius: var(--radius-lg); font-size: 1.1rem;">
+    <h3 style="margin-bottom: var(--space-md);">CORS Error Detected</h3>
+    <p style="margin-bottom: var(--space-lg);">The app cannot load modules directly from the filesystem due to CORS security restrictions.</p>
+    <div style="background: rgba(255,255,255,0.1); padding: var(--space-md); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 0.9rem;">
+      <strong>To fix this, open a terminal in this folder and run:</strong><br><br>
+      <span style="color: var(--accent);">python3 -m http.server 8080</span><br><br>
+      Then visit: <a href="http://localhost:8080" style="color: white; text-decoration: underline;">http://localhost:8080</a>
+    </div>
+  </div>
 
   <main class="container">
     <!-- Upload Section -->
@@ -594,7 +672,7 @@
     </section>
 
     <!-- Help Modal -->
-    <div id="help-modal" style="display: none;">
+    <div id="help-modal" class="modal" style="display: none;">
       <div class="modal-content" style="max-width: 600px; max-height: 80vh; overflow-y: auto;">
         <div class="modal-header">
           <h2>Help & Quick Start</h2>
@@ -702,16 +780,25 @@
   <!-- Toast Container -->
   <div id="toast-container"></div>
 
-  <!-- Scripts -->
-  <script type="module">
+  <script>
+    // Detect if running from file:// - if so, show CORS warning
+    if (window.location.protocol === 'file:') {
+      document.getElementById('server-warning').style.display = 'block';
+    }
+  </script>
+
+  <!-- Scripts - only loaded if not running from file -->
+  <script type="module" id="app-scripts">
+    // This script will fail to load when opened from file:// due to CORS
     import { app } from './src/main.js';
     window.subtitleWizardApp = app;
 
     console.log('Subtitle Wizard initialized');
   </script>
 
-  <!-- Button handlers -->
-  <script type="module">
+  <!-- Button handlers - only loaded if not running from file -->
+  <script type="module" id="ui-scripts">
+    // This script will fail to load when opened from file:// due to CORS
     import { uploadUI } from './src/ui/UploadUI.js';
     import { sessionStore } from './src/storage/SessionStore.js';
     import { subtitleManager } from './src/subtitles/SubtitleManager.js';
@@ -730,9 +817,31 @@
     const fileInfo = document.getElementById('file-info');
     const fileName = document.getElementById('file-name');
     const fileSize = document.getElementById('file-size');
+    const helpBtn = document.getElementById('help-btn');
+    const helpModal = document.getElementById('help-modal');
+    const helpCloseBtn = helpModal.querySelector('.modal-close');
 
     // Event handlers
     browseBtn.addEventListener('click', () => fileInput.click());
+
+    // Help button modal handler
+    helpBtn.addEventListener('click', () => {
+      helpModal.style.display = 'block';
+      document.body.style.overflow = 'hidden';
+    });
+
+    helpCloseBtn.addEventListener('click', () => {
+      helpModal.style.display = 'none';
+      document.body.style.overflow = '';
+    });
+
+    // Close modal when clicking outside content
+    helpModal.addEventListener('click', (e) => {
+      if (e.target === helpModal) {
+        helpModal.style.display = 'none';
+        document.body.style.overflow = '';
+      }
+    });
 
     fileInput.addEventListener('change', (e) => {
       if (e.target.files.length > 0) {
@@ -827,6 +936,20 @@
     // Initialize progress bar
     const progressBar = createProgressBar('progress-container');
     progressBar.init();
+
+    // Initialize app
+    window.subtitleWizardApp.init();
+
+    // Hide warning since everything loaded successfully
+    document.getElementById('server-warning').style.display = 'none';
+  </script>
+
+  <script id="check-cors">
+    // Check if CORS scripts loaded - if this runs, scripts failed to load
+    if (document.getElementById('app-scripts')) {
+      // Scripts exist in DOM, meaning they failed to load
+      // The warning should already be visible from file: check at top
+    }
   </script>
 </body>
 </html>

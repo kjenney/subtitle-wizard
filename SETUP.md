@@ -8,10 +8,30 @@ Subtitle Wizard is a browser-based application for automatically generating subt
 
 ### Step 1: Open the Application
 
-1. Clone or download this repository
-2. Open `index.html` in a modern browser (Chrome, Firefox, Safari, or Edge)
+**Important**: Due to browser CORS security, you cannot open `index.html` directly from your filesystem. You must use a local web server.
+
+1. Open a terminal in the project directory
+2. Start a local server (choose one of these):
+
+```bash
+# Option A: Python 3
+python3 -m http.server 8080
+
+# Option B: Python 2
+python -m SimpleHTTPServer 8080
+
+# Option C: Node.js (with http-server package)
+npx http-server -p 8080
+
+# Option D: PHP
+php -S localhost:8080
+```
+
+3. Open your browser and visit: `http://localhost:8080`
 
 **No installation required!** The app runs entirely in your browser.
+
+> **Note**: When using a local server, the app loads ES6 modules properly and works without CORS errors.
 
 ### Step 2: Prepare AWS Credentials
 
