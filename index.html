@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Subtitle Wizard - Video subtitle generator using AWS Polly">
+  <title>Subtitle Wizard</title>
+  <style>
+    :root {
+      /* Color palette */
+      --bg-primary: #0f172a;
+      --bg-secondary: #1e293b;
+      --bg-tertiary: #334155;
+      --fg-primary: #f1f5f9;
+      --fg-secondary: #cbd5e1;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --error: #ef4444;
+
+      /* Type scale */
+      --font-heading: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+      /* Spacing */
+      --space-xs: 0.25rem;
+      --space-sm: 0.5rem;
+      --space-md: 1rem;
+      --space-lg: 1.5rem;
+      --space-xl: 2rem;
+
+      /* Border radius */
+      --radius-sm: 4px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+    }
+
+    [data-theme="dark"] {
+      --bg-primary: #0f172a;
+      --bg-secondary: #1e293b;
+      --bg-tertiary: #334155;
+      --fg-primary: #f1f5f9;
+      --fg-secondary: #cbd5e1;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --error: #ef4444;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]) {
+        --bg-primary: #f8fafc;
+        --bg-secondary: #e2e8f0;
+        --bg-tertiary: #94a3b8;
+        --fg-primary: #0f172a;
+        --fg-secondary: #475569;
+        --accent: #2563eb;
+        --accent-hover: #1d4ed8;
+        --success: #059669;
+        --warning: #d97706;
+        --error: #dc2626;
+      }
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg-primary: #0f172a;
+        --bg-secondary: #1e293b;
+        --bg-tertiary: #334155;
+        --fg-primary: #f1f5f9;
+        --fg-secondary: #cbd5e1;
+        --accent: #3b82f6;
+        --accent-hover: #2563eb;
+        --success: #10b981;
+        --warning: #f59e0b;
+        --error: #ef4444;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      font-size: 16px;
+      scroll-behavior: smooth;
+    }
+
+    body {
+      background: var(--bg-primary);
+      color: var(--fg-primary);
+      font-family: var(--font-body);
+      line-height: 1.5;
+      padding: max(16px, env(safe-area-inset-left)) max(16px, env(safe-area-inset-right));
+      min-height: 100vh;
+    }
+
+    /* Header */
+    header {
+      background: var(--bg-secondary);
+      padding: var(--space-lg) 0;
+      border-bottom: 1px solid var(--bg-tertiary);
+      margin-bottom: var(--space-xl);
+    }
+
+    .header-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: var(--space-md);
+    }
+
+    .btn {
+      padding: var(--space-sm) var(--space-md);
+      border-radius: var(--radius-sm);
+      border: none;
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+    }
+
+    .btn-secondary {
+      background: var(--bg-tertiary);
+      color: var(--fg-primary);
+    }
+
+    .btn-secondary:hover {
+      background: var(--fg-secondary);
+    }
+
+    .btn-success {
+      background: var(--success);
+      color: white;
+    }
+
+    .btn-success:hover {
+      background: #059669;
+    }
+
+    /* Main container */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    /* Upload section */
+    #upload-container {
+      background: var(--bg-secondary);
+      border-radius: var(--radius-lg);
+      padding: var(--space-xl);
+      border: 2px dashed var(--bg-tertiary);
+      text-align: center;
+      transition: all 0.3s;
+      margin-bottom: var(--space-xl);
+    }
+
+    #upload-container.drag-over {
+      border-color: var(--accent);
+      background: rgba(59, 130, 246, 0.1);
+    }
+
+    .upload-icon svg {
+      width: 64px;
+      height: 64px;
+      color: var(--fg-secondary);
+      margin-bottom: var(--space-md);
+    }
+
+    .upload-title {
+      font-size: 1.25rem;
+      margin-bottom: var(--space-xs);
+    }
+
+    .upload-hint {
+      color: var(--fg-secondary);
+      font-size: 0.875rem;
+      margin-bottom: var(--space-lg);
+    }
+
+    .file-info {
+      text-align: left;
+      margin-top: var(--space-lg);
+    }
+
+    .file-name {
+      font-weight: 600;
+      margin-bottom: var(--space-xs);
+    }
+
+    .file-size {
+      color: var(--fg-secondary);
+      font-size: 0.875rem;
+      margin-bottom: var(--space-md);
+    }
+
+    /* Video player section */
+    #video-container {
+      position: relative;
+      background: var(--bg-secondary);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      margin-bottom: var(--space-xl);
+    }
+
+    /* Progress bar */
+    .progress-container {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      height: 8px;
+      overflow: hidden;
+      margin: var(--space-md) 0;
+    }
+
+    .progress-bar-bg {
+      height: 100%;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--accent);
+      width: 0%;
+      transition: width 0.3s;
+    }
+
+    .progress-percent {
+      font-size: 0.75rem;
+      color: var(--fg-secondary);
+      text-align: center;
+    }
+
+    .progress-status {
+      color: var(--fg-secondary);
+      font-size: 0.875rem;
+      margin: var(--space-sm) 0;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: var(--space-sm);
+      margin-bottom: var(--space-lg);
+      border-bottom: 1px solid var(--bg-tertiary);
+      padding-bottom: var(--space-sm);
+    }
+
+    .tab {
+      padding: var(--space-sm) var(--space-md);
+      border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+      background: transparent;
+      border: none;
+      color: var(--fg-secondary);
+      cursor: pointer;
+      font-size: 0.875rem;
+      transition: all 0.2s;
+    }
+
+    .tab.active {
+      background: var(--bg-secondary);
+      color: var(--accent);
+      border-bottom: 2px solid var(--accent);
+    }
+
+    /* Subtitle list */
+    .subtitle-list {
+      background: var(--bg-secondary);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+
+    .subtitle-item {
+      padding: var(--space-md);
+      border-bottom: 1px solid var(--bg-tertiary);
+      display: grid;
+      grid-template-columns: 100px 1fr auto;
+      gap: var(--space-md);
+      align-items: center;
+    }
+
+    .subtitle-item:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .subtitle-time {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--fg-secondary);
+    }
+
+    .subtitle-text {
+      word-break: break-word;
+    }
+
+    .subtitle-confidence {
+      font-size: 0.75rem;
+    }
+
+    .confidence-high { color: var(--success); }
+    .confidence-medium { color: var(--warning); }
+    .confidence-low { color: var(--error); }
+
+    /* Controls */
+    .controls {
+      display: flex;
+      gap: var(--space-md);
+      flex-wrap: wrap;
+    }
+
+    /* Toast container */
+    #toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .toast {
+      background: var(--accent);
+      color: white;
+      padding: 12px 16px;
+      border-radius: 6px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      animation: toast-slide-in 0.3s ease;
+      max-width: 400px;
+      pointer-events: auto;
+    }
+
+    @keyframes toast-slide-in {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @keyframes toast-slide-out {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+      to {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+    }
+
+    /* Loading spinner */
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 1s linear infinite;
+      margin-right: 8px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Form elements */
+    .form-group {
+      margin-bottom: var(--space-md);
+    }
+
+    .form-label {
+      display: block;
+      margin-bottom: var(--space-xs);
+      font-size: 0.875rem;
+      color: var(--fg-secondary);
+    }
+
+    .form-input {
+      width: 100%;
+      padding: var(--space-sm) var(--space-md);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--bg-tertiary);
+      background: var(--bg-primary);
+      color: var(--fg-primary);
+      font-size: 0.875rem;
+    }
+
+    .form-input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .subtitle-item {
+        grid-template-columns: 1fr;
+        gap: var(--space-sm);
+      }
+
+      .header-content {
+        flex-direction: column;
+        gap: var(--space-md);
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-content">
+      <div class="logo">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1"/>
+          <path d="M16 6l-4-4-4 4"/>
+          <path d="M12 10V2"/>
+        </svg>
+        Subtitle Wizard
+      </div>
+      <nav class="nav-links">
+        <button class="btn btn-secondary" id="help-btn">Help</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Upload Section -->
+    <section id="upload-section">
+      <div id="upload-container">
+        <div class="upload-content">
+          <div class="upload-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+          </div>
+          <h3 class="upload-title">Drag & Drop Video File</h3>
+          <p class="upload-hint">or click to browse</p>
+          <input type="file" id="file-input" accept="video/*" style="display: none">
+          <button class="btn btn-primary" id="browse-btn">Choose File</button>
+          <button class="btn btn-secondary" id="toggle-url-btn" style="margin-top: var(--space-sm); font-size: 0.75rem;">Or enter URL instead</button>
+        </div>
+        <div class="file-info" id="file-info" style="display: none">
+          <div class="file-name" id="file-name"></div>
+          <div class="file-size" id="file-size"></div>
+          <progress id="progress-bar" value="0" max="100" style="display: none; width: 100%; height: 8px;"></progress>
+          <div class="file-actions">
+            <button class="btn btn-secondary" id="remove-btn">Remove</button>
+            <button class="btn btn-success" id="process-btn" disabled>Process Video</button>
+          </div>
+          <div class="url-input-container" id="url-input-container" style="display:none; margin-top: var(--space-md);">
+            <input type="text" class="form-input" id="url-input" placeholder="Or enter video URL">
+            <button class="btn btn-secondary" id="load-url-btn" style="margin-top: var(--space-xs);">Load from URL</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Video Player Section -->
+    <section id="video-section" style="display: none;">
+      <div id="video-container">
+        <!-- Video will be loaded here -->
+      </div>
+    </section>
+
+    <!-- Processing Controls -->
+    <section id="processing-section" style="display: none;">
+      <div style="background: var(--bg-secondary); padding: var(--space-lg); border-radius: var(--radius-lg);">
+        <h3 style="margin-bottom: var(--space-md);">Processing Options</h3>
+        <div class="form-group">
+          <label class="form-label" for="language-select">Language</label>
+          <select class="form-input" id="language-select">
+            <option value="en-US">English (US)</option>
+            <option value="en-GB">English (UK)</option>
+            <option value="es-ES">Spanish (Spain)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="voice-select">Voice</label>
+          <select class="form-input" id="voice-select">
+            <option value="Joanna">Joanna (Female)</option>
+            <option value="Kendra">Kendra (Female)</option>
+            <option value="Brian">Brian (Male)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="rate-range">Speech Rate</label>
+          <input type="range" class="form-input" id="rate-range" min="0.5" max="2.0" step="0.1" value="1.0">
+          <span class="form-label" id="rate-value">1.0x</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Processing Status -->
+    <section id="status-section" style="display: none; margin-bottom: var(--space-xl);">
+      <div style="background: var(--bg-secondary); padding: var(--space-lg); border-radius: var(--radius-lg);">
+        <h3 style="margin-bottom: var(--space-md);">Processing Status</h3>
+        <div id="progress-container"></div>
+        <div class="controls" style="margin-top: var(--space-md);">
+          <button class="btn btn-success" id="extract-btn">Extract Audio</button>
+          <button class="btn btn-success" id="segment-btn" disabled>Generate Segments</button>
+          <button class="btn btn-success" id="synthesize-btn" disabled>Generate Subtitles</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Subtitle Preview -->
+    <section id="subtitle-section" style="display: none;">
+      <h2 style="margin-bottom: var(--space-md);">Subtitles</h2>
+
+      <div class="controls" style="margin-bottom: var(--space-md);">
+        <button class="btn btn-secondary" id="export-btn">Export SRT</button>
+      </div>
+
+      <div class="tabs">
+        <button class="tab active" data-tab="preview">Preview</button>
+        <button class="tab" data-tab="edit">Edit</button>
+      </div>
+
+      <div class="subtitle-list" id="subtitle-list">
+        <!-- Subtitle items will be rendered here -->
+      </div>
+    </section>
+
+    <!-- AWS Credentials Section -->
+    <section id="credentials-section" style="display: none; margin-bottom: var(--space-xl);">
+      <div style="background: var(--bg-secondary); padding: var(--space-lg); border-radius: var(--radius-lg);">
+        <h3 style="margin-bottom: var(--space-md);">AWS Credentials</h3>
+        <p class="form-label" style="margin-bottom: var(--space-lg); color: var(--fg-secondary);">
+          Enter your AWS Access Key ID and Secret Access Key to use Amazon Polly for subtitle generation.
+          Credentials are stored encrypted in your browser's local storage.
+        </p>
+        <div class="form-group">
+          <label class="form-label" for="aws-key-id">Access Key ID</label>
+          <input type="text" class="form-input" id="aws-key-id" placeholder="AKIA..." autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="aws-secret-key">Secret Access Key</label>
+          <input type="password" class="form-input" id="aws-secret-key" placeholder="Enter secret key" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="aws-region">AWS Region</label>
+          <select class="form-input" id="aws-region">
+            <option value="us-east-1">US East (N. Virginia)</option>
+            <option value="us-east-2">US East (Ohio)</option>
+            <option value="us-west-2">US West (Oregon)</option>
+            <option value="eu-west-1">EU (Ireland)</option>
+          </select>
+        </div>
+        <div class="controls">
+          <button class="btn btn-secondary" id="save-credentials-btn">Save & Test</button>
+          <button class="btn btn-secondary" id="clear-credentials-btn">Clear</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Help Modal -->
+    <div id="help-modal" style="display: none;">
+      <div class="modal-content" style="max-width: 600px; max-height: 80vh; overflow-y: auto;">
+        <div class="modal-header">
+          <h2>Help & Quick Start</h2>
+          <button class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <section style="margin-bottom: var(--space-lg);">
+            <h3 style="color: var(--accent); margin-bottom: var(--space-md);">Getting Started (5 minutes)</h3>
+            <ol style="padding-left: var(--space-xl); line-height: 1.8;">
+              <li><strong>Open this app</strong> in Chrome, Firefox, Safari, or Edge</li>
+              <li><strong>Setup AWS Credentials</strong> - Click "AWS Credentials" below and enter your Access Key ID and Secret Key</li>
+              <li><strong>Upload a video</strong> - Drag & drop or click "Choose File" (MP4, WebM, OGG, MOV)</li>
+              <li><strong>Extract Audio</strong> - Click "Extract Audio" button</li>
+              <li><strong>Generate Subtitles</strong> - Click "Generate Subtitles" and wait for Polly</li>
+              <li><strong>Export SRT</strong> - Click "Export SRT" to download</li>
+            </ol>
+          </section>
+
+          <section style="margin-bottom: var(--space-lg);">
+            <h3 style="color: var(--accent); margin-bottom: var(--space-md);">1. AWS Credentials Setup</h3>
+            <p style="margin-bottom: var(--space-md);">To use Amazon Polly for subtitle generation, you need AWS credentials:</p>
+            <ol style="padding-left: var(--space-xl); line-height: 1.8; margin-bottom: var(--space-md);">
+              <li>Sign in to <a href="https://aws.amazon.com/console/" target="_blank" style="color: var(--accent);">AWS Console</a></li>
+              <li>Go to <strong>IAM</strong> (Identity and Access Management)</li>
+              <li>Create a new user or use an existing one</li>
+              <li>Attach <strong>AmazonPollyReadOnlyAccess</strong> policy</li>
+              <li>Copy your <strong>Access Key ID</strong> and <strong>Secret Access Key</strong></li>
+            </ol>
+            <div style="padding: var(--space-md); background: rgba(239, 68, 68, 0.1); border-left: 3px solid var(--error); border-radius: var(--radius-sm);">
+              <strong style="color: var(--error);">Security Note:</strong> Your credentials are encrypted and stored only in your browser's local storage.
+            </div>
+          </section>
+
+          <section style="margin-bottom: var(--space-lg);">
+            <h3 style="color: var(--accent); margin-bottom: var(--space-md);">2. Supported Video Formats</h3>
+            <div style="background: var(--bg-tertiary); padding: var(--space-md); border-radius: var(--radius-sm);">
+              <p style="margin: 0;"><strong>Containers:</strong> MP4, WebM, OGG, MOV, AVI</p>
+              <p style="margin: var(--space-xs) 0 0 0;"><strong>Max file size:</strong> 500MB</p>
+            </div>
+          </section>
+
+          <section style="margin-bottom: var(--space-lg);">
+            <h3 style="color: var(--accent); margin-bottom: var(--space-md);">3. Keyboard Shortcuts</h3>
+            <table style="width: 100%; border-collapse: collapse; background: var(--bg-tertiary); border-radius: var(--radius-sm); overflow: hidden;">
+              <thead style="background: rgba(0,0,0,0.2);">
+                <tr>
+                  <th style="text-align: left; padding: var(--space-sm);">Key</th>
+                  <th style="text-align: left; padding: var(--space-sm);">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="border-bottom: 1px solid rgba(0,0,0,0.1);"><td style="padding: var(--space-sm); font-family: var(--font-mono);">Space</td><td style="padding: var(--space-sm);">Play/Pause</td></tr>
+                <tr style="border-bottom: 1px solid rgba(0,0,0,0.1);"><td style="padding: var(--space-sm); font-family: var(--font-mono);">Left/Right Arrow</td><td style="padding: var(--space-sm);">Seek ±1 second</td></tr>
+                <tr style="border-bottom: 1px solid rgba(0,0,0,0.1);"><td style="padding: var(--space-sm); font-family: var(--font-mono);">Shift + Left/Right</td><td style="padding: var(--space-sm);">Seek ±10 seconds</td></tr>
+                <tr style="border-bottom: 1px solid rgba(0,0,0,0.1);"><td style="padding: var(--space-sm); font-family: var(--font-mono);">Up/Down Arrow</td><td style="padding: var(--space-sm);">Adjust font size</td></tr>
+                <tr><td style="padding: var(--space-sm); font-family: var(--font-mono);">S</td><td style="padding: var(--space-sm);">Toggle subtitles</td></tr>
+              </tbody>
+            </table>
+          </section>
+
+          <section style="margin-bottom: var(--space-lg);">
+            <h3 style="color: var(--accent); margin-bottom: var(--space-md);">AWS Polly Pricing</h3>
+            <div style="background: var(--bg-tertiary); padding: var(--space-md); border-radius: var(--radius-sm);">
+              <p style="margin: 0;"><strong>US East (N. Virginia):</strong> $4.00 per million characters</p>
+              <p style="margin: var(--space-xs) 0 0 0;"><strong>Example:</strong> 10-minute video (~1500 words) costs about $0.01</p>
+              <p style="margin: var(--space-xs) 0 0 0; color: var(--fg-secondary); font-size: 0.875rem;">The app caches results to reduce costs on re-processing.</p>
+            </div>
+          </section>
+
+          <div style="padding: var(--space-md); background: rgba(59, 130, 246, 0.1); border-left: 3px solid var(--accent); border-radius: var(--radius-sm);">
+            <strong>Need more help?</strong> Check the full documentation at <a href="docs/HELP.md" style="color: var(--accent);">docs/HELP.md</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Keyboard Shortcuts Modal -->
+    <div id="shortcuts-modal" style="display: none;">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Keyboard Shortcuts</h2>
+          <button class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+              <tr style="border-bottom: 1px solid var(--bg-tertiary);">
+                <th style="text-align: left; padding: var(--space-sm);">Key</th>
+                <th style="text-align: left; padding: var(--space-sm);">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom: 1px solid var(--bg-tertiary);"><td style="padding: var(--space-sm); font-family: var(--font-mono);">Space</td><td style="padding: var(--space-sm);">Play/Pause video</td></tr>
+              <tr style="border-bottom: 1px solid var(--bg-tertiary);"><td style="padding: var(--space-sm); font-family: var(--font-mono);">Left/Right Arrow</td><td style="padding: var(--space-sm);">Seek 1 second</td></tr>
+              <tr style="border-bottom: 1px solid var(--bg-tertiary);"><td style="padding: var(--space-sm); font-family: var(--font-mono);">Shift + Left/Right</td><td style="padding: var(--space-sm);">Seek 10 seconds</td></tr>
+              <tr style="border-bottom: 1px solid var(--bg-tertiary);"><td style="padding: var(--space-sm); font-family: var(--font-mono);">Up/Down Arrow</td><td style="padding: var(--space-sm);">Adjust subtitle font size</td></tr>
+              <tr><td style="padding: var(--space-sm); font-family: var(--font-mono);">S</td><td style="padding: var(--space-sm);">Toggle subtitles on/off</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Toast Container -->
+  <div id="toast-container"></div>
+
+  <!-- Scripts -->
+  <script type="module">
+    import { app } from './src/main.js';
+    window.subtitleWizardApp = app;
+
+    console.log('Subtitle Wizard initialized');
+  </script>
+
+  <!-- Button handlers -->
+  <script type="module">
+    import { uploadUI } from './src/ui/UploadUI.js';
+    import { sessionStore } from './src/storage/SessionStore.js';
+    import { subtitleManager } from './src/subtitles/SubtitleManager.js';
+    import { videoPlayer } from './src/player/VideoPlayer.js';
+    import { toastManager } from './src/ui/Toast.js';
+    import { createProgressBar } from './src/ui/ProgressBar.js';
+
+    // Initialize UI
+    uploadUI.init();
+
+    // DOM Elements
+    const browseBtn = document.getElementById('browse-btn');
+    const fileInput = document.getElementById('file-input');
+    const processBtn = document.getElementById('process-btn');
+    const removeBtn = document.getElementById('remove-btn');
+    const fileInfo = document.getElementById('file-info');
+    const fileName = document.getElementById('file-name');
+    const fileSize = document.getElementById('file-size');
+
+    // Event handlers
+    browseBtn.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        handleFile(e.target.files[0]);
+      }
+    });
+
+    processBtn.addEventListener('click', async () => {
+      const file = uploadUI.getFile();
+      if (file) {
+        await handleVideoUpload(file);
+      }
+    });
+
+    removeBtn.addEventListener('click', () => {
+      uploadUI.reset();
+      document.getElementById('video-section').style.display = 'none';
+      document.getElementById('processing-section').style.display = 'none';
+      document.getElementById('status-section').style.display = 'none';
+      document.getElementById('subtitle-section').style.display = 'none';
+      subtitleManager.clear();
+    });
+
+    function handleFile(file) {
+      const validation = validateVideoFile(file);
+      if (!validation.valid) {
+        alert(validation.error);
+        return;
+      }
+
+      uploadUI.currentFile = file;
+      fileName.textContent = file.name;
+      fileSize.textContent = formatFileSize(file.size);
+      fileInfo.style.display = 'block';
+      fileInput.closest('.upload-content').style.display = 'none';
+      processBtn.disabled = false;
+
+      toastManager.success(`Selected: ${file.name}`);
+    }
+
+    function validateVideoFile(file) {
+      const supportedTypes = ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'];
+      if (!supportedTypes.includes(file.type)) {
+        return { valid: false, error: 'Unsupported file type' };
+      }
+      if (file.size > 500 * 1024 * 1024) {
+        return { valid: false, error: 'File too large (max 500MB)' };
+      }
+      return { valid: true };
+    }
+
+    function formatFileSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    async function handleVideoUpload(file) {
+      try {
+        toastManager.info('Loading video...');
+
+        // Get video container
+        const videoContainer = document.getElementById('video-container');
+
+        // Create video element
+        const video = document.createElement('video');
+        video.controls = true;
+        video.style.width = '100%';
+        video.style.maxWidth = '800px';
+        video.style.backgroundColor = '#000';
+
+        const url = URL.createObjectURL(file);
+        video.src = url;
+
+        videoContainer.innerHTML = '';
+        videoContainer.appendChild(video);
+
+        video.addEventListener('loadedmetadata', () => {
+          toastManager.success(`Video loaded: ${file.name}`);
+          document.getElementById('video-section').style.display = 'block';
+          document.getElementById('processing-section').style.display = 'block';
+          document.getElementById('status-section').style.display = 'block';
+          document.getElementById('subtitle-section').style.display = 'block';
+        });
+
+      } catch (error) {
+        toastManager.error('Failed to load video');
+        console.error(error);
+      }
+    }
+
+    // Initialize progress bar
+    const progressBar = createProgressBar('progress-container');
+    progressBar.init();
+  </script>
+</body>
+</html>
