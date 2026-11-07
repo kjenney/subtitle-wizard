@@ -42,14 +42,16 @@ class SubtitleWizard {
   async init() {
     logger.info('Initializing Subtitle Wizard...');
 
-    // Initialize UI components
+    // Initialize upload UI before setting up callbacks
     uploadUI.init();
+
+    // Initialize video player
     videoPlayer.init();
 
     // Initialize session store
     await sessionStore.init();
 
-    // Setup event handlers
+    // Setup event handlers (callback is set before uploadUI sets up event listeners)
     this.setupEventHandlers();
 
     // Load saved session if exists
@@ -103,6 +105,12 @@ class SubtitleWizard {
 
       toastManager.success(`Video loaded: ${file.name}`);
       logger.info(`Video uploaded: ${file.name}`);
+
+      // Show video player and processing sections
+      document.getElementById('video-section').style.display = 'block';
+      document.getElementById('processing-section').style.display = 'block';
+      document.getElementById('status-section').style.display = 'block';
+      document.getElementById('subtitle-section').style.display = 'block';
 
     } catch (error) {
       logger.error('Failed to upload video:', error);

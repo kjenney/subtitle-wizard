@@ -812,9 +812,6 @@
     import { toastManager } from './src/ui/Toast.js';
     import { createProgressBar } from './src/ui/ProgressBar.js';
 
-    // Initialize UI
-    uploadUI.init();
-
     // DOM Elements
     const browseBtn = document.getElementById('browse-btn');
     const fileInput = document.getElementById('file-input');
@@ -1091,9 +1088,6 @@
     // Initialize progress bar
     const progressBar = createProgressBar('progress-container');
     progressBar.init();
-
-    // Initialize app
-    window.subtitleWizardApp.init();
 
     // Hide warning since everything loaded successfully
     document.getElementById('server-warning').style.display = 'none';
